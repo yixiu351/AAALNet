@@ -95,10 +95,9 @@ vgg = nn.Sequential(
 )
 
 
-# Aesthetic discriminator
-class AesDiscriminator(nn.Module):
+class RPAD(nn.Module):
     def __init__(self, in_channels=3):
-        super(AesDiscriminator, self).__init__()
+        super(RPAD, self).__init__()
         def discriminator_block(in_filters, out_filters, normalize=True):
             layers = [nn.Conv2d(in_filters, out_filters, 4, stride=2, padding=1)]
             if normalize:
@@ -140,9 +139,7 @@ class AesDiscriminator(nn.Module):
                     nn.Conv2d(512, 1, 3, padding=1)
                 )
             )
-        # 使用深度可分离卷积进行下采样
         self.downsample = nn.Conv2d(in_channels, in_channels, 3, stride=2, padding=1, groups=in_channels)
-        # self.downsample = nn.AvgPool2d(in_channels, stride=2, padding=[1, 1], count_include_pad=False)
 
     # Compute the MSE between model output and scalar gt
     def compute_loss(self, x, gt):
@@ -160,13 +157,11 @@ class AesDiscriminator(nn.Module):
             outputs.append(self.score_models[i](self.models[i](x)))
             x = self.downsample(x)
 
-        # 定义上采样类
         class UpsampleToMatch(nn.Module):
             def __init__(self, in_channels, target_size):
                 super(UpsampleToMatch, self).__init__()
                 self.target_size = target_size
 
-                # 定义上采样层
                 self.upsample = nn.ConvTranspose2d(
                     in_channels,
                     in_channels,
@@ -181,31 +176,22 @@ class AesDiscriminator(nn.Module):
                     x = self.upsample(x)
                 return x
 
-        # 创建上采样模块实例
         def create_upsample_model(target_tensor):
             in_channels = target_tensor.size(1)
             target_size = target_tensor.size()
             return UpsampleToMatch(in_channels, target_size)
-        # self.upsample = nn.Upsample(size=(feats[0].size()[2],feats[0].size()[3]), mode='nearest')
+    
 
         feat = feats[0]
         upsample_model = create_upsample_model(feat).to(device)
         for i in range(1 ,len(feats)):
             feat += upsample_model(feats[i])
-
-        # for i in range(3):
-        #     print(f"feats:{feats[i].shape}")
-        #     print(f"outputs:{outputs[i].shape}")
-        #
-        # print(feat.shape)
-
         return feat, outputs
 
 
-# Aesthetic-aware style-attention (AesSA) module
-class AesSA(nn.Module):
+class ASA(nn.Module):
     def __init__(self, in_planes):
-        super(AesSA, self).__init__()
+        super(ASA, self).__init__()
         self.a = nn.Conv2d(in_planes, in_planes, (1, 1))
         self.b = nn.Conv2d(in_planes, in_planes, (1, 1))
         self.c = nn.Conv2d(in_planes, in_planes, (1, 1))
@@ -266,8 +252,8 @@ class AesSA(nn.Module):
 class Transform(nn.Module):
     def __init__(self, in_planes):
         super(Transform, self).__init__()
-        self.AesSA_4_1 = AesSA(in_planes=in_planes)
-        self.AesSA_5_1 = AesSA(in_planes=in_planes)
+        self.ASA_4_1 = ASA(in_planes=in_planes)
+        self.ASA_5_1 = ASA(in_planes=in_planes)
         self.merge_conv_pad = nn.ReflectionPad2d((1, 1, 1, 1))
         self.merge_conv = nn.Conv2d(in_planes, in_planes, (3, 3))
 
@@ -276,13 +262,13 @@ class Transform(nn.Module):
         self.upsample_style4_1 = nn.Upsample(size=(style4_1.size()[2], style4_1.size()[3]), mode='nearest')
         self.upsample_style5_1 = nn.Upsample(size=(style5_1.size()[2], style5_1.size()[3]), mode='nearest')
         if aesthetic_feats != None:
-            return self.merge_conv(self.merge_conv_pad(self.AesSA_4_1(content4_1, style4_1, self.upsample_style4_1(
+            return self.merge_conv(self.merge_conv_pad(self.ASA_4_1(content4_1, style4_1, self.upsample_style4_1(
                 aesthetic_feats)) + self.upsample_content4_1(
-                self.AesSA_5_1(content5_1, style5_1, self.upsample_style5_1(aesthetic_feats)))))
+                self.ASA_5_1(content5_1, style5_1, self.upsample_style5_1(aesthetic_feats)))))
         else:
             return self.merge_conv(self.merge_conv_pad(
-                self.AesSA_4_1(content4_1, style4_1, aesthetic_feats) + self.upsample_content4_1(
-                    self.AesSA_5_1(content5_1, style5_1, aesthetic_feats))))
+                self.ASA_4_1(content4_1, style4_1, aesthetic_feats) + self.upsample_content4_1(
+                    self.ASA_5_1(content5_1, style5_1, aesthetic_feats))))
 
 
 class Net(nn.Module):
@@ -339,7 +325,7 @@ class Net(nn.Module):
 
         n = h * w
         T = torch.zeros((b, n, n - 1))
-        # REMOVE DIAGONAL
+
         for i in range(b):
             T[i] = S[i].flatten()[1:].view(n - 1, n + 1)[:, :-1].reshape(n, n - 1)
         T = self.sm(T / 100)
@@ -410,28 +396,3 @@ class Net(nn.Module):
 
         l_identity = 50 * l_identity1 + l_identity2
         return g_t, loss_c,loss_attention, loss_s, loss_gan_d, loss_gan_g, l_identity, loss_aesthetic
-
-# discriminator=AesDiscriminator()
-# encoder=vgg
-# # 初始化模型
-# net = Net(encoder, decoder, discriminator)
-# net.to(device)
-# # 创建随机的内容和风格张量作为测试输入
-# content_tensor = torch.randn(1, 3, 256, 256).to(device)  # 假设内容张量形状为 [batch_size, channels, height, width]
-# style_tensor = torch.randn(1, 3, 256, 256).to(device)   # 假设风格张量形状为 [batch_size, channels, height, width]
-# # 将输入传递给模型
-# with torch.no_grad():
-#     generated_image, loss_c,loss_attention, loss_s, loss_gan_d, loss_gan_g, l_identity, loss_aesthetic = net(content_tensor, style_tensor)
-# # 处理输出
-# # 打印损失值
-# # print("Content Loss:", loss_c.item())
-# # print("Style Loss:", loss_s.item())
-# # print("GAN Discriminator Loss:", loss_gan_d.item())
-# # print("GAN Generator Loss:", loss_gan_g.item())
-# # print("Identity Loss:", l_identity.item())
-# # print("Aesthetic Loss:", loss_aesthetic.item())
-# # print("NET:",net)
-# # summary(net,[(3,256,256),(3,256,256)])
-# # 返回风格化的张量
-# print("Generated Image Tensor:", generated_image.shape)
-

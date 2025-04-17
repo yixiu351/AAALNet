@@ -13,7 +13,7 @@ from tensorboardX import SummaryWriter
 from torchvision import transforms
 from torchvision.utils import save_image
 
-import net_full_model
+import aaalnet
 from sampler import InfiniteSamplerWrapper
 
 cudnn.benchmark = True
@@ -101,14 +101,14 @@ checkpoints_dir = Path(args.checkpoints)
 checkpoints_dir.mkdir(exist_ok=True, parents=True)
 writer = SummaryWriter(log_dir=str(log_dir))
 
-decoder = net_full_model.decoder
-vgg = net_full_model.vgg
+decoder = aaalnet.decoder
+vgg = aaalnet.vgg
 
-discriminator = net_full_model.AesDiscriminator()
+discriminator = aaalnet.RPAD()
 
 vgg.load_state_dict(torch.load(args.vgg))
 vgg = nn.Sequential(*list(vgg.children())[:44])
-network = net_full_model.Net(vgg, decoder, discriminator)
+network = aaalnet.Net(vgg, decoder, discriminator)
 network.train()
 network.to(device)
 

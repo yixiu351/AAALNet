@@ -1,0 +1,12 @@
+  pillow
+  numpy
+  torch>=1.8.1
+  clip
+  ftfy
+  imageio
+  kornia
+  matplotlib
+  opencv-python
+  protobuf
+  scikit-image
+  scipy

@@ -4,8 +4,7 @@ import torch.nn as nn
 from PIL import Image
 from torchvision import transforms
 from torchvision.utils import save_image
-import net_full_model
-# import net_RPAD
+import aaalnet
 from pathlib import Path
 import time
 import traceback
@@ -38,9 +37,9 @@ parser.add_argument('--style_dir', type=str, default = r"./style_anime",
 
 # Models                  
 parser.add_argument('--vgg', type=str, default = 'models/vgg_normalised.pth')
-parser.add_argument('--decoder', type=str, default = 'models_anime/decoder_iter_160000.pth')
-parser.add_argument('--transform', type=str, default = 'models_anime/transformer_iter_160000.pth')
-parser.add_argument('--discriminator', type=str, default = 'models_anime/discriminator_iter_160000.pth')
+parser.add_argument('--decoder', type=str, default = 'models/decoder_iter_160000.pth')
+parser.add_argument('--transform', type=str, default = 'models/transformer_iter_160000.pth')
+parser.add_argument('--discriminator', type=str, default = 'models/discriminator_iter_160000.pth')
 
 # Additional options
 parser.add_argument('--content_size', type=int, default=0,
@@ -102,20 +101,15 @@ else:
 
 
 # Load models
-decoder = net_full_model.decoder
-transform = net_full_model.Transform(in_planes = 512)
-vgg = net_full_model.vgg
-discriminator = net_full_model.AesDiscriminator()
+decoder = aaalnet.decoder
+transform = aaalnet.Transform(in_planes = 512)
+vgg = aaalnet.vgg
+discriminator = aaalnet.AesDiscriminator()
 
 decoder.eval()
 transform.eval()
 vgg.eval()
 discriminator.eval()
-
-# decoder.load_state_dict(torch.load(args.decoder))
-# transform.load_state_dict(torch.load(args.transform))
-# vgg.load_state_dict(torch.load(args.vgg))
-# discriminator.load_state_dict(torch.load(args.discriminator))
 
 decoder.load_state_dict(torch.load(args.decoder, map_location=torch.device('cpu')))
 transform.load_state_dict(torch.load(args.transform, map_location=torch.device('cpu')))
